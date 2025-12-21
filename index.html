@@ -449,6 +449,8 @@
             position: relative;
             z-index: 10;
             background: white;
+            margin: 0;
+            padding: 0;
         }
 
         .note-wrapper {
@@ -462,7 +464,7 @@
         .dates-box {
             font-size: 0.65rem;
             color: #64748b;
-            margin-top: 5px;
+            margin-top: 0;
             margin-bottom: 0;
             border-top: 1px solid #f1f5f9;
             padding-top: 5px;
@@ -472,6 +474,8 @@
             position: relative;
             z-index: 10;
             background: white;
+            min-height: 30px;
+            flex-shrink: 0;
         }
 
         .dates-box>* {
@@ -486,6 +490,8 @@
             color: #475569;
             outline: none;
             font-size: 0.65rem;
+            min-height: 20px;
+            line-height: 1.5;
         }
 
         .date-input:focus {
@@ -509,9 +515,9 @@
 
         .note-container.open {
             max-height: 150px;
-            margin-top: 20px;
+            margin-top: 8px;
             border-top: 1px dashed #cbd5e1;
-            padding-top: 15px;
+            padding-top: 8px;
             min-height: 80px;
         }
 
