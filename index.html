@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detaylı Türk Soy Ağacı PRO</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Görsel çıktı alabilmek için gerekli kütüphane -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --sidebar-width: 320px;
+            --primary-color: #3b82f6;
+            --secondary-color: #64748b;
+            --line-color: #64748b;
+            --card-width: 150px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg-color);
+        }
+
+        /* --- SIDEBAR --- */
+        #sidebar {
+            width: var(--sidebar-width);
+            background: #1e293b;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            z-index: 100;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
+            overflow-y: auto;
+        }
+
+        #sidebar h2 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            text-align: center;
+            color: #e2e8f0;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        .add-root-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .add-root-btn:hover {
+            background: #059669;
+        }
+
+        .panel-info {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border: 1px solid #334155;
+            text-align: center;
+        }
+
+        .panel-info span {
+            color: #38bdf8;
+            font-weight: bold;
+            display: block;
+            margin-top: 5px;
+        }
+
+        .category-title {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 15px 0 5px 0;
+            font-weight: 700;
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 10px 5px;
+            background: #334155;
+            border: none;
+            border-radius: 6px;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.8rem;
+            text-align: center;
+            height: 100%;
+        }
+
+        .btn:hover {
+            background: #475569;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .btn i {
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+
+        .btn-full {
+            grid-column: span 2;
+            flex-direction: row;
+            padding: 12px;
+        }
+
+        .btn-full i {
+            margin-right: 10px;
+            margin-bottom: 0;
+        }
+
+        .male-btn {
+            border-bottom: 3px solid #3b82f6;
+        }
+
+        .female-btn {
+            border-bottom: 3px solid #ec4899;
+        }
+
+        .spouse-btn {
+            border-bottom: 3px solid #8b5cf6;
+        }
+
+        .danger-btn {
+            background: #7f1d1d !important;
+            color: #fecaca;
+            margin-top: 20px;
+        }
+
+        /* --- KAYDET MENÜSÜ --- */
+        #save-menu-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        #save-toggle-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #save-dropdown {
+            position: absolute;
+            top: 50px;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            display: none;
+            flex-direction: column;
+            width: 200px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        #save-dropdown.open {
+            display: flex;
+        }
+
+        .dropdown-item {
+            padding: 12px 15px;
+            font-size: 0.9rem;
+            color: #1e293b;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+
+        .dropdown-item:hover {
+            background: #f1f5f9;
+        }
+
+        .dropdown-item.exit {
+            color: #ef4444;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .dropdown-item i {
+            width: 16px;
+            text-align: center;
+        }
+
+        /* --- CANVAS --- */
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-color: #f0f2f5;
+            background-image: linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px);
+            background-size: 40px 40px;
+            cursor: grab;
+            transition: background-color 0.3s;
+        }
+
+        /* Drag & Drop Feedback */
+        #canvas-container.drag-over {
+            background-color: #e0f2fe;
+            outline: 4px dashed #3b82f6;
+            outline-offset: -10px;
+        }
+
+        #tree-canvas {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform-origin: 50% 0;
+            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            padding: 50px;
+        }
+
+        /* --- TREE STRUCTURE --- */
+        .tree>ul {
+            display: flex;
+            flex-direction: row;
+            gap: 100px;
+            padding-top: 0;
+            align-items: flex-start;
+        }
+
+        .tree ul {
+            padding-top: 40px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+        }
+
+        .tree li {
+            text-align: center;
+            list-style-type: none;
+            position: relative;
+            padding: 40px 10px 0 10px;
+        }
+
+        .tree li::before,
+        .tree li::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 50%;
+            border-top: 3px solid var(--line-color);
+            width: 50%;
+            height: 40px;
+        }
+
+        .tree li::after {
+            right: auto;
+            left: 50%;
+            border-left: 3px solid var(--line-color);
+        }
+
+        .tree li:only-child::after,
+        .tree li:only-child::before {
+            display: none;
+        }
+
+        .tree li:only-child {
+            padding-top: 0;
+        }
+
+        .tree li:first-child::before,
+        .tree li:last-child::after {
+            border: 0 none;
+        }
+
+        .tree li:last-child::before {
+            border-right: 3px solid var(--line-color);
+            border-radius: 0 5px 0 0;
+        }
+
+        .tree li:first-child::after {
+            border-radius: 5px 0 0 0;
+        }
+
+        .tree>ul>li::before,
+        .tree>ul>li::after {
+            display: none;
+        }
+
+        .tree>ul>li {
+            padding-top: 0;
+        }
+
+        .node-wrapper {
+            display: inline-flex;
+            align-items: center;
+            padding: 10px;
+            position: relative;
+            justify-content: center;
+        }
+
+        .has-children>.node-wrapper::after {
+            content: '';
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3px;
+            height: 40px;
+            background: var(--line-color);
+            z-index: 1;
+        }
+
+        /* --- KİŞİ KARTI --- */
+        .person-card {
+            background: white;
+            border: 2px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 10px;
+            width: var(--card-width);
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            cursor: pointer;
+            z-index: 2;
+            position: relative;
+            transition: all 0.3s;
+            min-height: 120px;
+        }
+
+        .person-card.selected {
+            border-color: var(--primary-color);
+            background: #eff6ff;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        }
+
+        .toggle-note-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 22px;
+            height: 22px;
+            background: #f59e0b;
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            z-index: 10;
+        }
+
+        .toggle-note-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .toggle-note-btn.active {
+            background: #10b981;
+        }
+
+        .person-card .icon {
+            font-size: 1.4rem;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .male .icon {
+            color: #3b82f6;
+        }
+
+        .female .icon {
+            color: #ec4899;
+        }
+
+        .card-content {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .person-card .name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #1e293b;
+            outline: none;
+            display: block;
+            padding: 2px;
+            min-height: 1.2em;
+            cursor: text;
+        }
+
+        .role-label {
+            font-size: 0.6rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 2px;
+            display: block;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .dates-wrapper {
+            display: block;
+            width: 100%;
+            position: relative;
+            z-index: 10;
+            background: white;
+        }
+
+        .note-wrapper {
+            display: block;
+            width: 100%;
+            clear: both;
+            position: relative;
+            z-index: 1;
+        }
+
+        .dates-box {
+            font-size: 0.65rem;
+            color: #64748b;
+            margin-top: 5px;
+            margin-bottom: 0;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 5px;
+            padding-bottom: 5px;
+            display: block;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+            background: white;
+        }
+
+        .dates-box>* {
+            display: inline;
+        }
+
+        .date-input {
+            border: none;
+            background: transparent;
+            width: 45%;
+            text-align: center;
+            color: #475569;
+            outline: none;
+            font-size: 0.65rem;
+        }
+
+        .date-input:focus {
+            color: var(--primary-color);
+        }
+
+        /* Not / Açıklama Alanı */
+        .note-container {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease, margin-top 0.4s ease, padding-top 0.4s ease;
+            margin-top: 0;
+            padding-top: 0;
+            text-align: left;
+            display: block;
+            clear: both;
+            position: relative;
+            z-index: 1;
+            transform: translateY(0);
+        }
+
+        .note-container.open {
+            max-height: 150px;
+            margin-top: 20px;
+            border-top: 1px dashed #cbd5e1;
+            padding-top: 15px;
+            min-height: 80px;
+        }
+
+        .note-textarea {
+            width: 100%;
+            height: 70px;
+            border: none;
+            background: #f8fafc;
+            border-radius: 4px;
+            padding: 5px;
+            margin-top: 5px;
+            font-size: 0.75rem;
+            color: #475569;
+            resize: none;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .spouse-connector {
+            width: 30px;
+            height: 3px;
+            background: #ef4444;
+            margin: 0 5px;
+            position: relative;
+        }
+
+        .spouse-connector i {
+            position: absolute;
+            top: -8px;
+            left: 7px;
+            color: #ef4444;
+            font-size: 12px;
+            background: #f0f2f5;
+            padding: 0 3px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+
+<body ondragover="view.handleDragOver(event)" ondragleave="view.handleDragLeave(event)" ondrop="view.handleDrop(event)">
+
+    <nav id="sidebar">
+        <h2><i class="fas fa-project-diagram"></i> SOY AĞACI PRO</h2>
+
+        <button class="add-root-btn" onclick="logic.addRootNode()">
+            <i class="fas fa-user-plus"></i> Yeni Başlangıç Ekle
+        </button>
+
+        <div class="panel-info">
+            <small>Seçili Kişi:</small>
+            <span id="selected-name-display">Başlangıç</span>
+        </div>
+
+        <div class="category-title">Çekirdek Aile</div>
+        <div class="btn-grid">
+            <button class="btn male-btn" onclick="logic.addChild('male')"><i class="fas fa-baby"></i>Oğlu</button>
+            <button class="btn female-btn" onclick="logic.addChild('female')"><i
+                    class="fas fa-baby-carriage"></i>Kızı</button>
+            <button class="btn spouse-btn btn-full" onclick="logic.addSpouse()"><i class="fas fa-ring"></i>Eş
+                Ekle</button>
+            <button class="btn btn-full" onclick="logic.addParent()"><i class="fas fa-arrow-up"></i>Anne/Baba
+                Ekle</button>
+        </div>
+
+        <div class="category-title">Kardeş & Yeğen</div>
+        <div class="btn-grid">
+            <button class="btn" onclick="logic.addSibling('male')"><i class="fas fa-male"></i>Erkek Kardeş</button>
+            <button class="btn" onclick="logic.addSibling('female')"><i class="fas fa-female"></i>Kız Kardeş</button>
+            <button class="btn" onclick="logic.addNephew('male')"><i class="fas fa-child"></i>Erkek Yeğen</button>
+            <button class="btn" onclick="logic.addNephew('female')"><i class="fas fa-child-dress"></i>Kız Yeğen</button>
+        </div>
+
+        <div class="category-title">Baba Tarafı</div>
+        <div class="btn-grid">
+            <button class="btn male-btn" onclick="logic.addRelativeComplex('amca')"><i
+                    class="fas fa-user-tie"></i>Amca</button>
+            <button class="btn female-btn" onclick="logic.addRelativeComplex('hala')"><i
+                    class="fas fa-user-nurse"></i>Hala</button>
+            <button class="btn male-btn" onclick="logic.addRelativeComplex('dede_baba')"><i
+                    class="fas fa-blind"></i>Dede (Baba)</button>
+            <button class="btn female-btn" onclick="logic.addRelativeComplex('babaanne')"><i
+                    class="fas fa-person-cane"></i>Babaanne</button>
+            <button class="btn btn-full" onclick="logic.addRelativeComplex('kuzen_baba')"><i
+                    class="fas fa-users"></i>Kuzen (Baba)</button>
+        </div>
+
+        <div class="category-title">Anne Tarafı</div>
+        <div class="btn-grid">
+            <button class="btn male-btn" onclick="logic.addRelativeComplex('dayi')"><i
+                    class="fas fa-user-astronaut"></i>Dayı</button>
+            <button class="btn female-btn" onclick="logic.addRelativeComplex('teyze')"><i
+                    class="fas fa-user-graduate"></i>Teyze</button>
+            <button class="btn male-btn" onclick="logic.addRelativeComplex('dede_anne')"><i
+                    class="fas fa-blind"></i>Dede (Anne)</button>
+            <button class="btn female-btn" onclick="logic.addRelativeComplex('anneanne')"><i
+                    class="fas fa-person-cane"></i>Anneanne</button>
+            <button class="btn btn-full" onclick="logic.addRelativeComplex('kuzen_anne')"><i
+                    class="fas fa-users"></i>Kuzen (Anne)</button>
+        </div>
+
+        <button class="btn btn-full danger-btn" onclick="logic.deleteNode()"><i class="fas fa-trash"></i>Seçili Kişiyi
+            Sil</button>
+        <button class="btn btn-full" onclick="view.resetZoom()" style="margin-top:10px; background:#475569"><i
+                class="fas fa-compress-arrows-alt"></i>Merkezle</button>
+    </nav>
+
+    <div id="save-menu-container">
+        <button id="save-toggle-btn" onclick="view.toggleSaveMenu()">
+            <i class="fas fa-save"></i> Kaydet <i class="fas fa-chevron-down"></i>
+        </button>
+        <div id="save-dropdown">
+            <button class="dropdown-item" onclick="logic.exportPNG()">
+                <i class="fas fa-image"></i> Görsel olarak kayıt et
+            </button>
+            <button class="dropdown-item" onclick="logic.exportProject()">
+                <i class="fas fa-file-code"></i> Proje dosyası olarak kaydet
+            </button>
+            <button class="dropdown-item exit" onclick="logic.exitApp()">
+                <i class="fas fa-sign-out-alt"></i> Bi sikim yapmadan çıkış yap
+            </button>
+        </div>
+    </div>
+
+    <div id="canvas-container" onmousedown="view.startPan(event)">
+        <div id="tree-canvas" class="tree"></div>
+    </div>
+
+    <script>
+        let data = {
+            nodes: [
+                { id: 1, name: "Başlangıç Kişisi", gender: "male", spouseId: null, childrenIds: [], parentId: null, birth: "", death: "", isParentOfSelected: false, note: "", noteOpen: false }
+            ],
+            nextId: 2,
+            selectedId: 1
+        };
+
+        const logic = {
+            find: (id) => data.nodes.find(n => n.id === id),
+
+            createNode: (name, gender, isParent = false) => {
+                const newNode = {
+                    id: data.nextId++,
+                    name: name,
+                    gender: gender,
+                    spouseId: null,
+                    childrenIds: [],
+                    parentId: null,
+                    birth: "",
+                    death: "",
+                    note: "",
+                    noteOpen: false,
+                    isParentOfSelected: isParent
+                };
+                data.nodes.push(newNode);
+                return newNode;
+            },
+
+            getSelected: () => logic.find(data.selectedId),
+
+            addRootNode: () => {
+                const newNode = logic.createNode("Yeni Başlangıç", "male");
+                data.selectedId = newNode.id;
+                view.render();
+            },
+
+            addChild: (gender) => {
+                const current = logic.getSelected();
+                if (!current) return;
+                const child = logic.createNode(gender === 'male' ? "Yeni Oğul" : "Yeni Kız", gender);
+                child.parentId = current.id;
+                current.childrenIds.push(child.id);
+                view.render();
+            },
+
+            addSpouse: () => {
+                const current = logic.getSelected();
+                if (!current || current.spouseId) return;
+                const spouseGender = current.gender === 'male' ? 'female' : 'male';
+                const spouse = logic.createNode("Yeni Eş", spouseGender, false);
+                current.spouseId = spouse.id;
+                spouse.spouseId = current.id;
+                view.render();
+            },
+
+            addParent: () => {
+                const current = logic.getSelected();
+                if (!current || current.parentId) return;
+                const father = logic.createNode("Baba", "male", true);
+                const mother = logic.createNode("Anne", "female", true);
+                father.spouseId = mother.id;
+                mother.spouseId = father.id;
+                father.childrenIds.push(current.id);
+                current.parentId = father.id;
+                view.render();
+            },
+
+            addSibling: (gender) => {
+                const current = logic.getSelected();
+                if (!current) return;
+                if (!current.parentId) logic.ensureParents(current);
+                const parent = logic.find(current.parentId);
+                const sibling = logic.createNode(gender === 'male' ? "Erkek Kardeş" : "Kız Kardeş", gender);
+                sibling.parentId = parent.id;
+                parent.childrenIds.push(sibling.id);
+                view.render();
+            },
+
+            addNephew: (gender) => {
+                const current = logic.getSelected();
+                if (!current) return;
+                if (!current.parentId) logic.ensureParents(current);
+                const parent = logic.find(current.parentId);
+                const sibling = logic.createNode("Kardeş", 'male');
+                sibling.parentId = parent.id;
+                parent.childrenIds.push(sibling.id);
+                const nephew = logic.createNode(gender === 'male' ? "Yeğen" : "Yeğen", gender);
+                nephew.parentId = sibling.id;
+                sibling.childrenIds.push(nephew.id);
+                view.render();
+            },
+
+            addRelativeComplex: (type) => {
+                const current = logic.getSelected();
+                if (!current) return;
+                if (!current.parentId) logic.ensureParents(current);
+                const father = logic.find(current.parentId);
+                let targetParent = father;
+                if (type.includes('anne') || type === 'dayi' || type === 'teyze' || type === 'dede_anne') {
+                    if (!father.spouseId) logic.ensureSpouse(father);
+                    targetParent = logic.find(father.spouseId);
+                }
+                if (!targetParent.parentId) logic.ensureParents(targetParent, "Dede", "Nine");
+                const grandParent = logic.find(targetParent.parentId);
+
+                if (type.startsWith('kuzen')) {
+                    const parentOfCousin = logic.createNode(type.includes('baba') ? "Amca/Hala" : "Dayı/Teyze", 'male');
+                    parentOfCousin.parentId = grandParent.id;
+                    grandParent.childrenIds.push(parentOfCousin.id);
+                    const cousin = logic.createNode("Kuzen", 'male');
+                    cousin.parentId = parentOfCousin.id;
+                    parentOfCousin.childrenIds.push(cousin.id);
+                } else if (type === 'dede_baba' || type === 'dede_anne') {
+                    data.selectedId = grandParent.id;
+                } else if (type === 'babaanne' || type === 'anneanne') {
+                    if (grandParent.spouseId) data.selectedId = grandParent.spouseId;
+                } else {
+                    const relative = logic.createNode(type.charAt(0).toUpperCase() + type.slice(1), (type === 'amca' || type === 'dayi') ? 'male' : 'female');
+                    relative.parentId = grandParent.id;
+                    grandParent.childrenIds.push(relative.id);
+                }
+                view.render();
+            },
+
+            ensureParents: (node, fName = "Baba", mName = "Anne") => {
+                const f = logic.createNode(fName, "male", true);
+                const m = logic.createNode(mName, "female", true);
+                f.spouseId = m.id; m.spouseId = f.id;
+                f.childrenIds.push(node.id);
+                node.parentId = f.id;
+            },
+
+            ensureSpouse: (node) => {
+                const s = logic.createNode("Eş", node.gender === 'male' ? 'female' : 'male', false);
+                node.spouseId = s.id; s.spouseId = node.id;
+            },
+
+            deleteNode: () => {
+                const currentId = data.selectedId;
+                const current = logic.find(currentId);
+                if (!current) return;
+                const idsToDelete = new Set();
+                const collect = (id) => {
+                    if (idsToDelete.has(id)) return;
+                    const node = logic.find(id);
+                    if (!node) return;
+                    idsToDelete.add(id);
+                    if (node.spouseId) idsToDelete.add(node.spouseId);
+                    if (node.childrenIds) node.childrenIds.forEach(collect);
+                };
+                collect(currentId);
+                data.nodes.forEach(n => {
+                    if (n.childrenIds) n.childrenIds = n.childrenIds.filter(cid => !idsToDelete.has(cid));
+                    if (n.spouseId && idsToDelete.has(n.spouseId)) n.spouseId = null;
+                    if (n.parentId && idsToDelete.has(n.parentId)) n.parentId = null;
+                });
+                data.nodes = data.nodes.filter(n => !idsToDelete.has(n.id));
+                data.selectedId = data.nodes.length > 0 ? data.nodes[0].id : null;
+                view.render();
+            },
+
+            updateName: (id, name) => {
+                const n = logic.find(id);
+                if (n) n.name = name;
+                view.updateInfoPanel();
+            },
+
+            updateDates: (id, field, value) => {
+                const n = logic.find(id);
+                if (n) n[field] = value;
+            },
+
+            updateNote: (id, value) => {
+                const n = logic.find(id);
+                if (n) n.note = value;
+            },
+
+            toggleNote: (id) => {
+                const n = logic.find(id);
+                if (n) {
+                    n.noteOpen = !n.noteOpen;
+                    view.render();
+                }
+            },
+
+            exportPNG: async () => {
+                const canvas = document.getElementById('tree-canvas');
+                const menu = document.getElementById('save-dropdown');
+                menu.classList.remove('open');
+
+                const originalTransform = canvas.style.transform;
+                canvas.style.transform = 'none';
+
+                try {
+                    const blobCanvas = await html2canvas(canvas, {
+                        backgroundColor: '#f0f2f5',
+                        scale: 2,
+                        useCORS: true
+                    });
+                    const link = document.createElement('a');
+                    link.download = `soy-agaci-${Date.now()}.png`;
+                    link.href = blobCanvas.toDataURL("image/png");
+                    link.click();
+                } catch (err) {
+                    console.error("PNG Hatası:", err);
+                } finally {
+                    canvas.style.transform = originalTransform;
+                }
+            },
+
+            exportProject: () => {
+                const projectData = JSON.stringify(data, null, 2);
+                const blob = new Blob([projectData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `soy-agaci-proje-${Date.now()}.json`;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+                view.toggleSaveMenu();
+            },
+
+            exitApp: () => {
+                if (confirm("Kaydedilmemiş değişiklikler kaybolabilir. Çıkmak istediğinize emin misiniz?")) {
+                    window.location.reload();
+                }
+            }
+        };
+
+        const view = {
+            scale: 0.9, pointX: 0, pointY: 0,
+            init: () => {
+                view.render();
+                document.getElementById('canvas-container').addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                    view.scale = Math.min(Math.max(0.2, view.scale + delta), 2);
+                    view.updateTransform();
+                });
+            },
+
+            toggleSaveMenu: () => {
+                document.getElementById('save-dropdown').classList.toggle('open');
+            },
+
+            handleDragOver: (e) => {
+                e.preventDefault();
+                document.getElementById('canvas-container').classList.add('drag-over');
+            },
+
+            handleDragLeave: (e) => {
+                document.getElementById('canvas-container').classList.remove('drag-over');
+            },
+
+            handleDrop: (e) => {
+                e.preventDefault();
+                document.getElementById('canvas-container').classList.remove('drag-over');
+
+                const file = e.dataTransfer.files[0];
+                if (file && file.type === "application/json" || file.name.endsWith('.json')) {
+                    if (confirm("Projeyi yüklemek istediğinize emin misiniz? Mevcut ağaç silinecektir.")) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            try {
+                                const importedData = JSON.parse(event.target.result);
+                                if (importedData.nodes && importedData.nextId) {
+                                    data = importedData;
+                                    view.render();
+                                } else {
+                                    alert("Geçersiz proje dosyası.");
+                                }
+                            } catch (err) {
+                                alert("Dosya okunurken bir hata oluştu.");
+                            }
+                        };
+                        reader.readAsText(file);
+                    }
+                } else {
+                    alert("Lütfen geçerli bir .json proje dosyası sürükleyin.");
+                }
+            },
+
+            render: () => {
+                const container = document.getElementById('tree-canvas');
+                container.innerHTML = '';
+                const roots = data.nodes.filter(n => {
+                    if (n.parentId !== null) return false;
+                    if (n.spouseId) {
+                        const spouse = logic.find(n.spouseId);
+                        if (spouse && spouse.parentId !== null) return false;
+                        if (spouse && spouse.parentId === null) return n.id < spouse.id;
+                    }
+                    return true;
+                });
+                const ul = document.createElement('ul');
+                roots.forEach(root => ul.appendChild(view.createNodeHTML(root, true)));
+                container.appendChild(ul);
+                view.updateInfoPanel();
+                view.updateTransform();
+            },
+
+            createNodeHTML: (node, isMainInPair = true) => {
+                const li = document.createElement('li');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'node-wrapper';
+                wrapper.appendChild(view.createCard(node, !isMainInPair));
+                if (node.spouseId) {
+                    const spouse = logic.find(node.spouseId);
+                    if (spouse) {
+                        const conn = document.createElement('div');
+                        conn.className = 'spouse-connector';
+                        conn.innerHTML = '<i class="fas fa-heart"></i>';
+                        wrapper.appendChild(conn);
+                        wrapper.appendChild(view.createCard(spouse, true));
+                    }
+                }
+                li.appendChild(wrapper);
+                let combinedChildren = [...node.childrenIds];
+                if (node.spouseId) {
+                    const spouse = logic.find(node.spouseId);
+                    if (spouse) {
+                        spouse.childrenIds.forEach(cid => { if (!combinedChildren.includes(cid)) combinedChildren.push(cid); });
+                    }
+                }
+                if (combinedChildren.length > 0) {
+                    li.classList.add('has-children');
+                    const ul = document.createElement('ul');
+                    combinedChildren.forEach(childId => {
+                        const child = logic.find(childId);
+                        if (child) ul.appendChild(view.createNodeHTML(child, true));
+                    });
+                    li.appendChild(ul);
+                }
+                return li;
+            },
+
+            createCard: (node, isSpouseSide = false) => {
+                const div = document.createElement('div');
+                div.className = `person-card ${node.gender} ${node.id === data.selectedId ? 'selected' : ''}`;
+                div.onclick = (e) => { data.selectedId = node.id; view.render(); };
+
+                const icon = node.gender === 'male' ? 'fa-user' : 'fa-user-dress';
+                let roleHtml = isSpouseSide && !node.isParentOfSelected ? `<span class="role-label">${node.gender === 'male' ? "Kocası" : "Karısı"}</span>` : "";
+
+                const toggleBtn = document.createElement('div');
+                toggleBtn.className = `toggle-note-btn ${node.noteOpen ? 'active' : ''}`;
+                toggleBtn.innerHTML = `<i class="fas ${node.noteOpen ? 'fa-chevron-up' : 'fa-info'}"></i>`;
+                toggleBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    logic.toggleNote(node.id);
+                };
+                div.appendChild(toggleBtn);
+
+                const cardContent = `
+                    <div class="card-content">
+                        ${roleHtml}
+                        <i class="fas ${icon} icon"></i>
+                        <span class="name" contenteditable="true" 
+                            onclick="event.stopPropagation()" 
+                            onblur="logic.updateName(${node.id}, this.innerText)"
+                            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                        >${node.name}</span>
+                        <div class="dates-wrapper">
+                            <div class="dates-box" onclick="event.stopPropagation()">
+                                <input type="text" class="date-input" value="${node.birth || ''}" placeholder="Doğum" onblur="logic.updateDates(${node.id}, 'birth', this.value)">
+                                <span>-</span>
+                                <input type="text" class="date-input" value="${node.death || ''}" placeholder="Ölüm" onblur="logic.updateDates(${node.id}, 'death', this.value)">
+                            </div>
+                        </div>
+                        <div class="note-wrapper">
+                            <div class="note-container ${node.noteOpen ? 'open' : ''}" onclick="event.stopPropagation()">
+                                <textarea class="note-textarea" placeholder="Açıklama girin..." 
+                                    onblur="logic.updateNote(${node.id}, this.value)">${node.note || ''}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const contentWrapper = document.createElement('div');
+                contentWrapper.innerHTML = cardContent;
+                div.appendChild(contentWrapper);
+
+                return div;
+            },
+
+            updateInfoPanel: () => {
+                const n = logic.getSelected();
+                document.getElementById('selected-name-display').innerText = n ? n.name : "-";
+            },
+
+            startPan: (e) => {
+                if (e.target.closest('.person-card') || e.target.closest('.date-input') || e.target.closest('.note-textarea') || e.target.closest('#save-menu-container')) return;
+                view.panning = true;
+                view.startX = e.clientX - view.pointX;
+                view.startY = e.clientY - view.pointY;
+                document.onmousemove = view.doPan;
+                document.onmouseup = view.endPan;
+                document.getElementById('canvas-container').style.cursor = 'grabbing';
+            },
+            doPan: (e) => {
+                if (!view.panning) return;
+                view.pointX = e.clientX - view.startX;
+                view.pointY = e.clientY - view.startY;
+                view.updateTransform();
+            },
+            endPan: () => {
+                view.panning = false;
+                document.getElementById('canvas-container').style.cursor = 'grab';
+            },
+            updateTransform: () => {
+                document.getElementById('tree-canvas').style.transform = `translate(${view.pointX}px, ${view.pointY}px) scale(${view.scale})`;
+            },
+            resetZoom: () => { view.scale = 0.9; view.pointX = 0; view.pointY = 0; view.updateTransform(); }
+        };
+
+        window.onclick = function (event) {
+            if (!event.target.matches('#save-toggle-btn') && !event.target.closest('#save-toggle-btn')) {
+                const dropdown = document.getElementById('save-dropdown');
+                if (dropdown && dropdown.classList.contains('open')) {
+                    dropdown.classList.remove('open');
+                }
+            }
+        }
+
+        view.init();
+    </script>
+</body>
+
+</html>
