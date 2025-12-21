@@ -233,14 +233,17 @@
 
         /* --- CANVAS --- */
         #canvas-container {
-            flex: 1;
-            position: relative;
-            overflow: hidden;
-            background-color: #f0f2f5;
-            background-image: linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px);
+            width: calc(100% - var(--sidebar-width));
+            height: 100vh;
+            background-color: var(--bg-color);
+            background-image:
+                linear-gradient(rgba(203, 213, 225, 0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(203, 213, 225, 0.3) 1px, transparent 1px);
             background-size: 40px 40px;
+            overflow: hidden;
+            position: relative;
             cursor: grab;
-            transition: background-color 0.3s;
+            touch-action: none;
         }
 
         /* Drag & Drop Feedback */
@@ -554,10 +557,200 @@
             padding: 0 3px;
             border-radius: 50%;
         }
+
+        /* Hamburger Menü */
+        .hamburger-btn {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1001;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-size: 1.5rem;
+        }
+
+        .hamburger-btn:active {
+            transform: scale(0.95);
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* Tablet Responsive (768px - 1024px) */
+        @media (max-width: 1024px) {
+            :root {
+                --sidebar-width: 280px;
+                --card-width: 130px;
+            }
+
+            #sidebar h2 {
+                font-size: 1rem;
+            }
+
+            .btn {
+                font-size: 0.75rem;
+                padding: 8px 4px;
+            }
+
+            .tree>ul {
+                gap: 80px;
+            }
+        }
+
+        /* Mobil Responsive (<768px) */
+        @media (max-width: 768px) {
+            :root {
+                --card-width: 110px;
+            }
+
+            body {
+                flex-direction: column;
+            }
+
+            .hamburger-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            #sidebar {
+                position: fixed;
+                top: 0;
+                left: -320px;
+                height: 100vh;
+                z-index: 100;
+                transition: left 0.3s ease;
+                width: 280px;
+            }
+
+            #sidebar.open {
+                left: 0;
+            }
+
+            #canvas-container {
+                width: 100%;
+                height: calc(100vh - 60px);
+            }
+
+            #save-menu-container {
+                bottom: 20px;
+                right: 20px;
+                top: auto;
+            }
+
+            #save-toggle-btn {
+                width: auto;
+                height: 56px;
+                border-radius: 28px;
+                padding: 0 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                font-size: 0.9rem;
+            }
+
+            #save-dropdown {
+                bottom: 70px;
+                top: auto;
+                right: 0;
+            }
+
+            .tree>ul {
+                gap: 50px;
+            }
+
+            .tree li {
+                padding: 30px 8px 0 8px;
+            }
+
+            .person-card {
+                padding: 8px;
+            }
+
+            .person-card .icon {
+                font-size: 1.2rem;
+            }
+
+            .person-card .name {
+                font-size: 0.8rem;
+            }
+
+            .dates-box {
+                font-size: 0.6rem;
+            }
+
+            .date-input {
+                font-size: 0.6rem;
+            }
+
+            .note-textarea {
+                font-size: 0.7rem;
+                height: 60px;
+            }
+
+            .btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            .toggle-note-btn {
+                width: 28px;
+                height: 28px;
+                font-size: 12px;
+            }
+        }
+
+        /* Çok Küçük Mobil (<400px) */
+        @media (max-width: 400px) {
+            :root {
+                --card-width: 100px;
+            }
+
+            .tree>ul {
+                gap: 40px;
+            }
+
+            .person-card .name {
+                font-size: 0.75rem;
+            }
+
+            #sidebar {
+                width: 260px;
+                left: -260px;
+            }
+        }
     </style>
 </head>
 
 <body ondragover="view.handleDragOver(event)" ondragleave="view.handleDragLeave(event)" ondrop="view.handleDrop(event)">
+
+    <!-- Hamburger Menü Butonu -->
+    <button class="hamburger-btn" onclick="view.toggleSidebar()">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" onclick="view.closeSidebar()"></div>
 
     <nav id="sidebar">
         <h2><i class="fas fa-project-diagram"></i> SOY AĞACI PRO</h2>
@@ -641,7 +834,7 @@
         </div>
     </div>
 
-    <div id="canvas-container" onmousedown="view.startPan(event)">
+    <div id="canvas-container" onmousedown="view.startPan(event)" ontouchstart="view.startPan(event)">
         <div id="tree-canvas" class="tree"></div>
     </div>
 
@@ -892,6 +1085,20 @@
                 document.getElementById('save-dropdown').classList.toggle('open');
             },
 
+            toggleSidebar: () => {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.querySelector('.sidebar-overlay');
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            },
+
+            closeSidebar: () => {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.querySelector('.sidebar-overlay');
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+            },
+
             handleDragOver: (e) => {
                 e.preventDefault();
                 document.getElementById('canvas-container').classList.add('drag-over');
@@ -1039,22 +1246,45 @@
 
             startPan: (e) => {
                 if (e.target.closest('.person-card') || e.target.closest('.date-input') || e.target.closest('.note-textarea') || e.target.closest('#save-menu-container')) return;
+
+                // Touch veya mouse event'i ayırt et
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
                 view.panning = true;
-                view.startX = e.clientX - view.pointX;
-                view.startY = e.clientY - view.pointY;
+                view.startX = clientX - view.pointX;
+                view.startY = clientY - view.pointY;
+
+                // Hem mouse hem touch event'leri ekle
                 document.onmousemove = view.doPan;
                 document.onmouseup = view.endPan;
+                document.addEventListener('touchmove', view.doPan, { passive: false });
+                document.addEventListener('touchend', view.endPan);
+
                 document.getElementById('canvas-container').style.cursor = 'grabbing';
             },
             doPan: (e) => {
                 if (!view.panning) return;
-                view.pointX = e.clientX - view.startX;
-                view.pointY = e.clientY - view.startY;
+
+                // Touch event için preventDefault
+                if (e.touches) {
+                    e.preventDefault();
+                }
+
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                view.pointX = clientX - view.startX;
+                view.pointY = clientY - view.startY;
                 view.updateTransform();
             },
             endPan: () => {
                 view.panning = false;
                 document.getElementById('canvas-container').style.cursor = 'grab';
+
+                // Touch event listener'ları temizle
+                document.removeEventListener('touchmove', view.doPan);
+                document.removeEventListener('touchend', view.endPan);
             },
             updateTransform: () => {
                 document.getElementById('tree-canvas').style.transform = `translate(${view.pointX}px, ${view.pointY}px) scale(${view.scale})`;
