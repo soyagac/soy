@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detaylı Türk Soy Ağacı PRO</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <!-- Görsel çıktı alabilmek için gerekli kütüphane -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --bg-color: #f8fafc;
@@ -16,6 +16,7 @@
             --secondary-color: #64748b;
             --line-color: #64748b;
             --card-width: 150px;
+            --extra-spouse-color: #8b5cf6; /* Yan çar için mor renk */
         }
 
         * {
@@ -246,7 +247,6 @@
             touch-action: none;
         }
 
-        /* Drag & Drop Feedback */
         #canvas-container.drag-over {
             background-color: #e0f2fe;
             outline: 4px dashed #3b82f6;
@@ -446,6 +446,11 @@
             user-select: none;
         }
 
+        /* Yan çar için mor etiket stili */
+        .role-label.extra-spouse {
+            color: var(--extra-spouse-color);
+        }
+
         .dates-wrapper {
             display: block;
             width: 100%;
@@ -501,7 +506,6 @@
             color: var(--primary-color);
         }
 
-        /* Not / Açıklama Alanı */
         .note-container {
             max-height: 0;
             overflow: hidden;
@@ -558,7 +562,6 @@
             border-radius: 50%;
         }
 
-        /* Hamburger Menü */
         .hamburger-btn {
             display: none;
             position: fixed;
@@ -595,7 +598,6 @@
             display: block;
         }
 
-        /* Tablet Responsive (768px - 1024px) */
         @media (max-width: 1024px) {
             :root {
                 --sidebar-width: 280px;
@@ -616,7 +618,6 @@
             }
         }
 
-        /* Mobil Responsive (<768px) */
         @media (max-width: 768px) {
             :root {
                 --card-width: 110px;
@@ -720,7 +721,6 @@
             }
         }
 
-        /* Çok Küçük Mobil (<400px) */
         @media (max-width: 400px) {
             :root {
                 --card-width: 100px;
@@ -744,12 +744,10 @@
 
 <body ondragover="view.handleDragOver(event)" ondragleave="view.handleDragLeave(event)" ondrop="view.handleDrop(event)">
 
-    <!-- Hamburger Menü Butonu -->
     <button class="hamburger-btn" onclick="view.toggleSidebar()">
         <i class="fas fa-bars"></i>
     </button>
 
-    <!-- Sidebar Overlay -->
     <div class="sidebar-overlay" onclick="view.closeSidebar()"></div>
 
     <nav id="sidebar">
@@ -769,8 +767,8 @@
             <button class="btn male-btn" onclick="logic.addChild('male')"><i class="fas fa-baby"></i>Oğlu</button>
             <button class="btn female-btn" onclick="logic.addChild('female')"><i
                     class="fas fa-baby-carriage"></i>Kızı</button>
-            <button class="btn spouse-btn btn-full" onclick="logic.addSpouse()"><i class="fas fa-ring"></i>Eş
-                Ekle</button>
+            <button class="btn spouse-btn btn-full" onclick="logic.addSpouse()"><i class="fas fa-ring"></i>Eş Ekle</button>
+            <button class="btn spouse-btn btn-full" style="background:#8b5cf6; color:white; border-bottom:3px solid #6d28d9;" onclick="logic.addExtraSpouse()"><i class="fas fa-plus-circle"></i>Yan Çar (Eş) Ekle</button>
             <button class="btn btn-full" onclick="logic.addParent()"><i class="fas fa-arrow-up"></i>Anne/Baba
                 Ekle</button>
         </div>
@@ -825,6 +823,9 @@
             <button class="dropdown-item" onclick="logic.exportPNG()">
                 <i class="fas fa-image"></i> Görsel olarak kayıt et
             </button>
+            <button class="dropdown-item" onclick="logic.exportPDF()">
+                <i class="fas fa-file-pdf"></i> PDF olarak kayıt et
+            </button>
             <button class="dropdown-item" onclick="logic.exportProject()">
                 <i class="fas fa-file-code"></i> Proje dosyası olarak kaydet
             </button>
@@ -841,7 +842,7 @@
     <script>
         let data = {
             nodes: [
-                { id: 1, name: "Başlangıç Kişisi", gender: "male", spouseId: null, childrenIds: [], parentId: null, birth: "", death: "", isParentOfSelected: false, note: "", noteOpen: false }
+                { id: 1, name: "Başlangıç Kişisi", gender: "male", spouseId: null, extraSpouseIds: [], childrenIds: [], parentId: null, birth: "", death: "", isParentOfSelected: false, note: "", noteOpen: false }
             ],
             nextId: 2,
             selectedId: 1
@@ -850,19 +851,21 @@
         const logic = {
             find: (id) => data.nodes.find(n => n.id === id),
 
-            createNode: (name, gender, isParent = false) => {
+            createNode: (name, gender, isParent = false, isExtraSpouse = false) => {
                 const newNode = {
                     id: data.nextId++,
                     name: name,
                     gender: gender,
                     spouseId: null,
+                    extraSpouseIds: [],
                     childrenIds: [],
                     parentId: null,
                     birth: "",
                     death: "",
                     note: "",
                     noteOpen: false,
-                    isParentOfSelected: isParent
+                    isParentOfSelected: isParent,
+                    isExtraSpouse: isExtraSpouse // Yan çar olduğunu belirten alan
                 };
                 data.nodes.push(newNode);
                 return newNode;
@@ -888,10 +891,19 @@
             addSpouse: () => {
                 const current = logic.getSelected();
                 if (!current || current.spouseId) return;
-                const spouseGender = current.gender === 'male' ? 'female' : 'male';
-                const spouse = logic.createNode("Yeni Eş", spouseGender, false);
+                const spouse = logic.createNode("Yeni Eş", current.gender === 'male' ? 'female' : 'male');
                 current.spouseId = spouse.id;
                 spouse.spouseId = current.id;
+                view.render();
+            },
+
+            addExtraSpouse: () => {
+                const current = logic.getSelected();
+                if (!current) return;
+                const extraSpouse = logic.createNode("Yan Çar (Eş)", current.gender === 'male' ? 'female' : 'male', false, true);
+                if (!current.extraSpouseIds) current.extraSpouseIds = [];
+                current.extraSpouseIds.push(extraSpouse.id);
+                extraSpouse.spouseId = current.id;
                 view.render();
             },
 
@@ -981,22 +993,13 @@
                 const currentId = data.selectedId;
                 const current = logic.find(currentId);
                 if (!current) return;
-                const idsToDelete = new Set();
-                const collect = (id) => {
-                    if (idsToDelete.has(id)) return;
-                    const node = logic.find(id);
-                    if (!node) return;
-                    idsToDelete.add(id);
-                    if (node.spouseId) idsToDelete.add(node.spouseId);
-                    if (node.childrenIds) node.childrenIds.forEach(collect);
-                };
-                collect(currentId);
+                data.nodes = data.nodes.filter(n => n.id !== currentId);
                 data.nodes.forEach(n => {
-                    if (n.childrenIds) n.childrenIds = n.childrenIds.filter(cid => !idsToDelete.has(cid));
-                    if (n.spouseId && idsToDelete.has(n.spouseId)) n.spouseId = null;
-                    if (n.parentId && idsToDelete.has(n.parentId)) n.parentId = null;
+                    if (n.childrenIds) n.childrenIds = n.childrenIds.filter(cid => cid !== currentId);
+                    if (n.spouseId === currentId) n.spouseId = null;
+                    if (n.extraSpouseIds) n.extraSpouseIds = n.extraSpouseIds.filter(sid => sid !== currentId);
+                    if (n.parentId === currentId) n.parentId = null;
                 });
-                data.nodes = data.nodes.filter(n => !idsToDelete.has(n.id));
                 data.selectedId = data.nodes.length > 0 ? data.nodes[0].id : null;
                 view.render();
             },
@@ -1029,25 +1032,34 @@
                 const canvas = document.getElementById('tree-canvas');
                 const menu = document.getElementById('save-dropdown');
                 menu.classList.remove('open');
-
                 const originalTransform = canvas.style.transform;
                 canvas.style.transform = 'none';
-
                 try {
-                    const blobCanvas = await html2canvas(canvas, {
-                        backgroundColor: '#f0f2f5',
-                        scale: 2,
-                        useCORS: true
-                    });
+                    const blobCanvas = await html2canvas(canvas, { backgroundColor: '#f0f2f5', scale: 2, useCORS: true });
                     const link = document.createElement('a');
                     link.download = `soy-agaci-${Date.now()}.png`;
                     link.href = blobCanvas.toDataURL("image/png");
                     link.click();
-                } catch (err) {
-                    console.error("PNG Hatası:", err);
-                } finally {
-                    canvas.style.transform = originalTransform;
-                }
+                } catch (err) { console.error(err); }
+                canvas.style.transform = originalTransform;
+            },
+
+            exportPDF: async () => {
+                const canvas = document.getElementById('tree-canvas');
+                const menu = document.getElementById('save-dropdown');
+                menu.classList.remove('open');
+                const originalTransform = canvas.style.transform;
+                canvas.style.transform = 'none';
+                try {
+                    const blobCanvas = await html2canvas(canvas, { backgroundColor: '#f0f2f5', scale: 2 });
+                    const imgData = blobCanvas.toDataURL('image/png');
+                    const { jsPDF } = window.jspdf;
+                    const orientation = blobCanvas.width > blobCanvas.height ? 'l' : 'p';
+                    const pdf = new jsPDF(orientation, 'px', [blobCanvas.width, blobCanvas.height]);
+                    pdf.addImage(imgData, 'PNG', 0, 0, blobCanvas.width, blobCanvas.height);
+                    pdf.save(`soy-agaci-${Date.now()}.pdf`);
+                } catch (err) { console.error(err); }
+                canvas.style.transform = originalTransform;
             },
 
             exportProject: () => {
@@ -1111,9 +1123,8 @@
             handleDrop: (e) => {
                 e.preventDefault();
                 document.getElementById('canvas-container').classList.remove('drag-over');
-
                 const file = e.dataTransfer.files[0];
-                if (file && file.type === "application/json" || file.name.endsWith('.json')) {
+                if (file && (file.type === "application/json" || file.name.endsWith('.json'))) {
                     if (confirm("Projeyi yüklemek istediğinize emin misiniz? Mevcut ağaç silinecektir.")) {
                         const reader = new FileReader();
                         reader.onload = (event) => {
@@ -1122,47 +1133,40 @@
                                 if (importedData.nodes && importedData.nextId) {
                                     data = importedData;
                                     view.render();
-                                } else {
-                                    alert("Geçersiz proje dosyası.");
-                                }
-                            } catch (err) {
-                                alert("Dosya okunurken bir hata oluştu.");
-                            }
+                                } else { alert("Geçersiz proje dosyası."); }
+                            } catch (err) { alert("Dosya okunurken bir hata oluştu."); }
                         };
                         reader.readAsText(file);
                     }
-                } else {
-                    alert("Lütfen geçerli bir .json proje dosyası sürükleyin.");
-                }
+                } else { alert("Lütfen geçerli bir .json proje dosyası sürükleyin."); }
             },
 
             render: () => {
                 const container = document.getElementById('tree-canvas');
                 container.innerHTML = '';
-                const roots = data.nodes.filter(n => {
-                    if (n.parentId !== null) return false;
-                    if (n.spouseId) {
-                        const spouse = logic.find(n.spouseId);
-                        if (spouse && spouse.parentId !== null) return false;
-                        if (spouse && spouse.parentId === null) return n.id < spouse.id;
-                    }
-                    return true;
-                });
+                const roots = data.nodes.filter(n => n.parentId === null && !data.nodes.find(p => p.spouseId === n.id && p.parentId !== null));
                 const ul = document.createElement('ul');
-                roots.forEach(root => ul.appendChild(view.createNodeHTML(root, true)));
+                roots.forEach(root => {
+                    const isSpouseOfSomeone = data.nodes.find(n => n.spouseId === root.id || (n.extraSpouseIds && n.extraSpouseIds.includes(root.id)));
+                    if (!isSpouseOfSomeone || isSpouseOfSomeone.id > root.id) {
+                        ul.appendChild(view.createNodeHTML(root));
+                    }
+                });
                 container.appendChild(ul);
                 view.updateInfoPanel();
                 view.updateTransform();
             },
 
-            createNodeHTML: (node, isMainInPair = true) => {
+            createNodeHTML: (node) => {
                 const li = document.createElement('li');
                 const wrapper = document.createElement('div');
                 wrapper.className = 'node-wrapper';
-                wrapper.appendChild(view.createCard(node, !isMainInPair));
+                wrapper.appendChild(view.createCard(node, false));
+
+                // Ana Eş
                 if (node.spouseId) {
                     const spouse = logic.find(node.spouseId);
-                    if (spouse) {
+                    if (spouse && !spouse.isExtraSpouse) {
                         const conn = document.createElement('div');
                         conn.className = 'spouse-connector';
                         conn.innerHTML = '<i class="fas fa-heart"></i>';
@@ -1170,20 +1174,29 @@
                         wrapper.appendChild(view.createCard(spouse, true));
                     }
                 }
-                li.appendChild(wrapper);
-                let combinedChildren = [...node.childrenIds];
-                if (node.spouseId) {
-                    const spouse = logic.find(node.spouseId);
-                    if (spouse) {
-                        spouse.childrenIds.forEach(cid => { if (!combinedChildren.includes(cid)) combinedChildren.push(cid); });
-                    }
+
+                // Ek Eşler (Yan Çarlar)
+                if (node.extraSpouseIds && node.extraSpouseIds.length > 0) {
+                    node.extraSpouseIds.forEach(sid => {
+                        const extraSpouse = logic.find(sid);
+                        if (extraSpouse) {
+                            const conn = document.createElement('div');
+                            conn.className = 'spouse-connector';
+                            conn.innerHTML = '<i class="fas fa-heart"></i>';
+                            wrapper.appendChild(conn);
+                            wrapper.appendChild(view.createCard(extraSpouse, true));
+                        }
+                    });
                 }
-                if (combinedChildren.length > 0) {
+
+                li.appendChild(wrapper);
+
+                if (node.childrenIds && node.childrenIds.length > 0) {
                     li.classList.add('has-children');
                     const ul = document.createElement('ul');
-                    combinedChildren.forEach(childId => {
+                    node.childrenIds.forEach(childId => {
                         const child = logic.find(childId);
-                        if (child) ul.appendChild(view.createNodeHTML(child, true));
+                        if (child) ul.appendChild(view.createNodeHTML(child));
                     });
                     li.appendChild(ul);
                 }
@@ -1196,15 +1209,25 @@
                 div.onclick = (e) => { data.selectedId = node.id; view.render(); };
 
                 const icon = node.gender === 'male' ? 'fa-user' : 'fa-user-dress';
-                let roleHtml = isSpouseSide && !node.isParentOfSelected ? `<span class="role-label">${node.gender === 'male' ? "Kocası" : "Karısı"}</span>` : "";
+                
+                // Rol etiketi mantığı
+                let roleHtml = "";
+                if (isSpouseSide && !node.isParentOfSelected) {
+                    if (node.isExtraSpouse) {
+                        // Yan çar etiketi (Mor renkli)
+                        const roleText = node.gender === 'male' ? "YAN ÇAR KOCASI" : "YAN ÇAR KARISI";
+                        roleHtml = `<span class="role-label extra-spouse">${roleText}</span>`;
+                    } else {
+                        // Normal eş etiketi
+                        const roleText = node.gender === 'male' ? "Kocası" : "Karısı";
+                        roleHtml = `<span class="role-label">${roleText}</span>`;
+                    }
+                }
 
                 const toggleBtn = document.createElement('div');
                 toggleBtn.className = `toggle-note-btn ${node.noteOpen ? 'active' : ''}`;
                 toggleBtn.innerHTML = `<i class="fas ${node.noteOpen ? 'fa-chevron-up' : 'fa-info'}"></i>`;
-                toggleBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    logic.toggleNote(node.id);
-                };
+                toggleBtn.onclick = (e) => { e.stopPropagation(); logic.toggleNote(node.id); };
                 div.appendChild(toggleBtn);
 
                 const cardContent = `
@@ -1231,11 +1254,9 @@
                         </div>
                     </div>
                 `;
-
                 const contentWrapper = document.createElement('div');
                 contentWrapper.innerHTML = cardContent;
                 div.appendChild(contentWrapper);
-
                 return div;
             },
 
@@ -1246,34 +1267,22 @@
 
             startPan: (e) => {
                 if (e.target.closest('.person-card') || e.target.closest('.date-input') || e.target.closest('.note-textarea') || e.target.closest('#save-menu-container')) return;
-
-                // Touch veya mouse event'i ayırt et
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
                 view.panning = true;
                 view.startX = clientX - view.pointX;
                 view.startY = clientY - view.pointY;
-
-                // Hem mouse hem touch event'leri ekle
                 document.onmousemove = view.doPan;
                 document.onmouseup = view.endPan;
                 document.addEventListener('touchmove', view.doPan, { passive: false });
                 document.addEventListener('touchend', view.endPan);
-
                 document.getElementById('canvas-container').style.cursor = 'grabbing';
             },
             doPan: (e) => {
                 if (!view.panning) return;
-
-                // Touch event için preventDefault
-                if (e.touches) {
-                    e.preventDefault();
-                }
-
+                if (e.touches) e.preventDefault();
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
                 view.pointX = clientX - view.startX;
                 view.pointY = clientY - view.startY;
                 view.updateTransform();
@@ -1281,8 +1290,6 @@
             endPan: () => {
                 view.panning = false;
                 document.getElementById('canvas-container').style.cursor = 'grab';
-
-                // Touch event listener'ları temizle
                 document.removeEventListener('touchmove', view.doPan);
                 document.removeEventListener('touchend', view.endPan);
             },
@@ -1295,12 +1302,9 @@
         window.onclick = function (event) {
             if (!event.target.matches('#save-toggle-btn') && !event.target.closest('#save-toggle-btn')) {
                 const dropdown = document.getElementById('save-dropdown');
-                if (dropdown && dropdown.classList.contains('open')) {
-                    dropdown.classList.remove('open');
-                }
+                if (dropdown && dropdown.classList.contains('open')) { dropdown.classList.remove('open'); }
             }
         }
-
         view.init();
     </script>
 </body>
