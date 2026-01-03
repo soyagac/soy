@@ -342,8 +342,14 @@
             justify-content: center;
         }
 
-        .has-children>.node-wrapper::after {
-            content: '';
+        .card-anchor {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .children-drop-line {
             position: absolute;
             bottom: -30px;
             left: 50%;
@@ -352,6 +358,7 @@
             height: 40px;
             background: var(--line-color);
             z-index: 1;
+            pointer-events: none;
         }
 
         /* --- KİŞİ KARTI --- */
@@ -842,7 +849,7 @@
     <script>
         let data = {
             nodes: [
-                { id: 1, name: "Başlangıç Kişisi", gender: "male", spouseId: null, extraSpouseIds: [], childrenIds: [], parentId: null, birth: "", death: "", isParentOfSelected: false, note: "", noteOpen: false }
+                { id: 1, name: "Başlangıç Kişisi", gender: "male", spouseId: null, extraSpouseIds: [], childrenIds: [], parentId: null, otherParentId: null, birth: "", death: "", isParentOfSelected: false, note: "", noteOpen: false }
             ],
             nextId: 2,
             selectedId: 1
@@ -860,6 +867,7 @@
                     extraSpouseIds: [],
                     childrenIds: [],
                     parentId: null,
+                    otherParentId: null,
                     birth: "",
                     death: "",
                     note: "",
@@ -873,6 +881,45 @@
 
             getSelected: () => logic.find(data.selectedId),
 
+            normalizeData: () => {
+                if (!data || typeof data !== 'object') data = {};
+                if (!Array.isArray(data.nodes)) data.nodes = [];
+                if (typeof data.nextId !== 'number') data.nextId = 1;
+                if (typeof data.selectedId !== 'number') data.selectedId = data.nodes[0]?.id ?? null;
+
+                for (const node of data.nodes) {
+                    if (!node || typeof node !== 'object') continue;
+                    if (typeof node.id !== 'number') continue;
+                    if (typeof node.name !== 'string') node.name = "İsimsiz";
+                    if (node.gender !== 'male' && node.gender !== 'female') node.gender = 'male';
+                    if (!('spouseId' in node)) node.spouseId = null;
+                    if (!Array.isArray(node.extraSpouseIds)) node.extraSpouseIds = [];
+                    if (!Array.isArray(node.childrenIds)) node.childrenIds = [];
+                    if (!('parentId' in node)) node.parentId = null;
+                    if (!('otherParentId' in node)) node.otherParentId = null;
+                    if (!('birth' in node)) node.birth = "";
+                    if (!('death' in node)) node.death = "";
+                    if (!('note' in node)) node.note = "";
+                    if (!('noteOpen' in node)) node.noteOpen = false;
+                    if (!('isParentOfSelected' in node)) node.isParentOfSelected = false;
+                    if (!('isExtraSpouse' in node)) node.isExtraSpouse = false;
+                }
+
+                const maxId = data.nodes.reduce((m, n) => (typeof n?.id === 'number' && n.id > m ? n.id : m), 0);
+                data.nextId = Math.max(data.nextId, maxId + 1);
+
+                const selectedExists = data.nodes.some(n => n.id === data.selectedId);
+                if (!selectedExists) data.selectedId = data.nodes[0]?.id ?? null;
+
+                // Main spouse reciprocity (best-effort)
+                for (const node of data.nodes) {
+                    if (node && node.spouseId != null) {
+                        const spouse = logic.find(node.spouseId);
+                        if (spouse && !spouse.isExtraSpouse && spouse.spouseId !== node.id) spouse.spouseId = node.id;
+                    }
+                }
+            },
+
             addRootNode: () => {
                 const newNode = logic.createNode("Yeni Başlangıç", "male");
                 data.selectedId = newNode.id;
@@ -882,9 +929,14 @@
             addChild: (gender) => {
                 const current = logic.getSelected();
                 if (!current) return;
+                const resolved = logic.resolveChildParents(current);
+                if (!resolved) return;
+                const { treeParent, otherParent } = resolved;
                 const child = logic.createNode(gender === 'male' ? "Yeni Oğul" : "Yeni Kız", gender);
-                child.parentId = current.id;
-                current.childrenIds.push(child.id);
+                child.parentId = treeParent.id;
+                child.otherParentId = otherParent ? otherParent.id : null;
+                if (!treeParent.childrenIds) treeParent.childrenIds = [];
+                treeParent.childrenIds.push(child.id);
                 view.render();
             },
 
@@ -900,22 +952,104 @@
             addExtraSpouse: () => {
                 const current = logic.getSelected();
                 if (!current) return;
-                const extraSpouse = logic.createNode("Yan Çar (Eş)", current.gender === 'male' ? 'female' : 'male', false, true);
-                if (!current.extraSpouseIds) current.extraSpouseIds = [];
-                current.extraSpouseIds.push(extraSpouse.id);
-                extraSpouse.spouseId = current.id;
+                const target = (current.isExtraSpouse && current.spouseId) ? logic.find(current.spouseId) : current;
+                if (!target) return;
+                const extraSpouse = logic.createNode("Yan Çar (Eş)", target.gender === 'male' ? 'female' : 'male', false, true);
+                if (!target.extraSpouseIds) target.extraSpouseIds = [];
+                target.extraSpouseIds.push(extraSpouse.id);
+                extraSpouse.spouseId = target.id;
                 view.render();
+            },
+
+            getSpouseNodes: (person) => {
+                if (!person) return [];
+                const spouseIds = [];
+                if (person.spouseId) spouseIds.push(person.spouseId);
+                if (person.extraSpouseIds && person.extraSpouseIds.length) spouseIds.push(...person.extraSpouseIds);
+                return [...new Set(spouseIds)]
+                    .map(id => logic.find(id))
+                    .filter(Boolean);
+            },
+
+            chooseSpouseForChild: (person, spouseNodes) => {
+                if (!spouseNodes || spouseNodes.length === 0) return null;
+                if (spouseNodes.length === 1) return spouseNodes[0];
+
+                const options = spouseNodes.map((s, idx) => {
+                    const rel = person.spouseId === s.id ? "ana eş" : "yan çar";
+                    return `${idx + 1}) ${s.name} (${rel})`;
+                }).join('\n');
+
+                const answer = prompt(`Çocuk hangi eşten olacak?\n${options}\n\nİptal için boş bırakabilirsiniz.`);
+                if (answer === null) return null;
+                const chosenIndex = Number(String(answer).trim());
+                if (!Number.isFinite(chosenIndex) || chosenIndex < 1 || chosenIndex > spouseNodes.length) return null;
+                return spouseNodes[chosenIndex - 1];
+            },
+
+            preferTreeParent: (a, b) => {
+                if (a.parentId != null && b.parentId == null) return a;
+                if (b.parentId != null && a.parentId == null) return b;
+                return a.id < b.id ? a : b;
+            },
+
+            resolveChildParents: (current) => {
+                // If user selected an extra spouse, default to "child from this extra spouse + owner"
+                if (current.isExtraSpouse && current.spouseId) {
+                    const owner = logic.find(current.spouseId);
+                    if (!owner) return { treeParent: current, otherParent: null };
+                    return { treeParent: owner, otherParent: current };
+                }
+
+                const spouseNodes = logic.getSpouseNodes(current);
+                const chosenSpouse = logic.chooseSpouseForChild(current, spouseNodes);
+                if (spouseNodes.length > 1 && !chosenSpouse) return null;
+
+                if (!chosenSpouse) return { treeParent: current, otherParent: null };
+
+                const a = current;
+                const b = chosenSpouse;
+
+                // Extra spouse ownership (only one side owns extraSpouseIds)
+                if (a.extraSpouseIds && a.extraSpouseIds.includes(b.id)) return { treeParent: a, otherParent: b };
+                if (b.extraSpouseIds && b.extraSpouseIds.includes(a.id)) return { treeParent: b, otherParent: a };
+
+                // Main spouse: attach children to the one that is actually in the tree
+                const treeParent = logic.preferTreeParent(a, b);
+                const otherParent = treeParent.id === a.id ? b : a;
+                return { treeParent, otherParent };
             },
 
             addParent: () => {
                 const current = logic.getSelected();
-                if (!current || current.parentId) return;
+                if (!current) return;
+
+                // If only one parent is present (old save), complete the missing side
+                if (current.parentId && current.otherParentId) return;
+                if (current.parentId && !current.otherParentId) {
+                    const father = logic.find(current.parentId);
+                    if (father) {
+                        if (!father.spouseId) {
+                            const mother = logic.createNode("Anne", "female", true);
+                            father.spouseId = mother.id;
+                            mother.spouseId = father.id;
+                            current.otherParentId = mother.id;
+                        } else {
+                            current.otherParentId = father.spouseId;
+                        }
+                        view.render();
+                        return;
+                    }
+                }
+
+                if (current.parentId) return;
                 const father = logic.createNode("Baba", "male", true);
                 const mother = logic.createNode("Anne", "female", true);
                 father.spouseId = mother.id;
                 mother.spouseId = father.id;
                 father.childrenIds.push(current.id);
                 current.parentId = father.id;
+                current.otherParentId = mother.id;
                 view.render();
             },
 
@@ -923,9 +1057,18 @@
                 const current = logic.getSelected();
                 if (!current) return;
                 if (!current.parentId) logic.ensureParents(current);
-                const parent = logic.find(current.parentId);
+                let parent = logic.find(current.parentId);
+                if (!parent) {
+                    current.parentId = null;
+                    current.otherParentId = null;
+                    logic.ensureParents(current);
+                    parent = logic.find(current.parentId);
+                }
+                if (!parent) return;
+                if (parent && !current.otherParentId && parent.spouseId) current.otherParentId = parent.spouseId;
                 const sibling = logic.createNode(gender === 'male' ? "Erkek Kardeş" : "Kız Kardeş", gender);
                 sibling.parentId = parent.id;
+                sibling.otherParentId = current.otherParentId ?? (parent ? parent.spouseId : null);
                 parent.childrenIds.push(sibling.id);
                 view.render();
             },
@@ -934,13 +1077,50 @@
                 const current = logic.getSelected();
                 if (!current) return;
                 if (!current.parentId) logic.ensureParents(current);
-                const parent = logic.find(current.parentId);
-                const sibling = logic.createNode("Kardeş", 'male');
-                sibling.parentId = parent.id;
-                parent.childrenIds.push(sibling.id);
-                const nephew = logic.createNode(gender === 'male' ? "Yeğen" : "Yeğen", gender);
-                nephew.parentId = sibling.id;
-                sibling.childrenIds.push(nephew.id);
+                let parent = logic.find(current.parentId);
+                if (!parent) {
+                    current.parentId = null;
+                    current.otherParentId = null;
+                    logic.ensureParents(current);
+                    parent = logic.find(current.parentId);
+                }
+                if (!parent) return;
+                if (parent && !current.otherParentId && parent.spouseId) current.otherParentId = parent.spouseId;
+
+                const siblingIds = (parent?.childrenIds || []).filter(cid => cid !== current.id);
+                const siblings = siblingIds.map(id => logic.find(id)).filter(Boolean);
+
+                let sibling = null;
+                if (siblings.length > 0) {
+                    const options = siblings.map((s, idx) => `${idx + 1}) ${s.name}`).join('\n');
+                    const answer = prompt(`Yeğen hangi kardeşin çocuğu?\n${options}\n0) Yeni kardeş oluştur\n\nİptal için boş bırakabilirsiniz.`);
+                    if (answer === null) return;
+                    const chosenIndex = Number(String(answer).trim());
+                    if (!Number.isFinite(chosenIndex)) return;
+                    if (chosenIndex === 0) {
+                        const g = prompt("Yeni kardeş cinsiyeti?\n1) Erkek\n2) Kadın");
+                        const gNum = Number(String(g ?? '').trim());
+                        const siblingGender = gNum === 2 ? 'female' : 'male';
+                        sibling = logic.createNode(siblingGender === 'male' ? "Erkek Kardeş" : "Kız Kardeş", siblingGender);
+                        sibling.parentId = parent.id;
+                        sibling.otherParentId = current.otherParentId ?? parent.spouseId ?? null;
+                        parent.childrenIds.push(sibling.id);
+                    } else if (chosenIndex >= 1 && chosenIndex <= siblings.length) {
+                        sibling = siblings[chosenIndex - 1];
+                    } else {
+                        return;
+                    }
+                } else {
+                    sibling = logic.createNode("Kardeş", 'male');
+                    sibling.parentId = parent.id;
+                    sibling.otherParentId = current.otherParentId ?? parent.spouseId ?? null;
+                    parent.childrenIds.push(sibling.id);
+                }
+
+                const prevSelected = data.selectedId;
+                data.selectedId = sibling.id;
+                logic.addChild(gender);
+                data.selectedId = prevSelected;
                 view.render();
             },
 
@@ -948,7 +1128,14 @@
                 const current = logic.getSelected();
                 if (!current) return;
                 if (!current.parentId) logic.ensureParents(current);
-                const father = logic.find(current.parentId);
+                let father = logic.find(current.parentId);
+                if (!father) {
+                    current.parentId = null;
+                    current.otherParentId = null;
+                    logic.ensureParents(current);
+                    father = logic.find(current.parentId);
+                }
+                if (!father) return;
                 let targetParent = father;
                 if (type.includes('anne') || type === 'dayi' || type === 'teyze' || type === 'dede_anne') {
                     if (!father.spouseId) logic.ensureSpouse(father);
@@ -982,6 +1169,7 @@
                 f.spouseId = m.id; m.spouseId = f.id;
                 f.childrenIds.push(node.id);
                 node.parentId = f.id;
+                node.otherParentId = m.id;
             },
 
             ensureSpouse: (node) => {
@@ -999,6 +1187,7 @@
                     if (n.spouseId === currentId) n.spouseId = null;
                     if (n.extraSpouseIds) n.extraSpouseIds = n.extraSpouseIds.filter(sid => sid !== currentId);
                     if (n.parentId === currentId) n.parentId = null;
+                    if (n.otherParentId === currentId) n.otherParentId = null;
                 });
                 data.selectedId = data.nodes.length > 0 ? data.nodes[0].id : null;
                 view.render();
@@ -1084,6 +1273,7 @@
         const view = {
             scale: 0.9, pointX: 0, pointY: 0,
             init: () => {
+                logic.normalizeData();
                 view.render();
                 document.getElementById('canvas-container').addEventListener('wheel', (e) => {
                     e.preventDefault();
@@ -1130,8 +1320,9 @@
                         reader.onload = (event) => {
                             try {
                                 const importedData = JSON.parse(event.target.result);
-                                if (importedData.nodes && importedData.nextId) {
+                                if (importedData.nodes && Array.isArray(importedData.nodes)) {
                                     data = importedData;
+                                    logic.normalizeData();
                                     view.render();
                                 } else { alert("Geçersiz proje dosyası."); }
                             } catch (err) { alert("Dosya okunurken bir hata oluştu."); }
@@ -1161,7 +1352,13 @@
                 const li = document.createElement('li');
                 const wrapper = document.createElement('div');
                 wrapper.className = 'node-wrapper';
-                wrapper.appendChild(view.createCard(node, false));
+                const hasChildren = node.childrenIds && node.childrenIds.length > 0;
+                const selfAnchor = document.createElement('div');
+                selfAnchor.className = 'card-anchor';
+                selfAnchor.appendChild(view.createCard(node, false));
+                wrapper.appendChild(selfAnchor);
+
+                const spouseAnchors = [];
 
                 // Ana Eş
                 if (node.spouseId) {
@@ -1171,7 +1368,11 @@
                         conn.className = 'spouse-connector';
                         conn.innerHTML = '<i class="fas fa-heart"></i>';
                         wrapper.appendChild(conn);
-                        wrapper.appendChild(view.createCard(spouse, true));
+                        const spouseAnchor = document.createElement('div');
+                        spouseAnchor.className = 'card-anchor';
+                        spouseAnchor.appendChild(view.createCard(spouse, true));
+                        wrapper.appendChild(spouseAnchor);
+                        spouseAnchors.push({ spouse, anchor: spouseAnchor, isPrimary: true });
                     }
                 }
 
@@ -1184,15 +1385,31 @@
                             conn.className = 'spouse-connector';
                             conn.innerHTML = '<i class="fas fa-heart"></i>';
                             wrapper.appendChild(conn);
-                            wrapper.appendChild(view.createCard(extraSpouse, true));
+                            const spouseAnchor = document.createElement('div');
+                            spouseAnchor.className = 'card-anchor';
+                            spouseAnchor.appendChild(view.createCard(extraSpouse, true));
+                            wrapper.appendChild(spouseAnchor);
+                            spouseAnchors.push({ spouse: extraSpouse, anchor: spouseAnchor, isPrimary: false });
                         }
                     });
                 }
 
+                if (hasChildren) {
+                    const dropLine = document.createElement('div');
+                    dropLine.className = 'children-drop-line';
+
+                    let anchor = selfAnchor;
+                    if (node.gender === 'female' && spouseAnchors.length > 0) {
+                        const ordered = [...spouseAnchors].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+                        const maleSpouses = ordered.filter(x => x.spouse.gender === 'male');
+                        if (maleSpouses.length === 1) anchor = maleSpouses[0].anchor;
+                    }
+                    anchor.appendChild(dropLine);
+                }
+
                 li.appendChild(wrapper);
 
-                if (node.childrenIds && node.childrenIds.length > 0) {
-                    li.classList.add('has-children');
+                if (hasChildren) {
                     const ul = document.createElement('ul');
                     node.childrenIds.forEach(childId => {
                         const child = logic.find(childId);
