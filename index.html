@@ -550,6 +550,10 @@
             box-sizing: border-box;
         }
 
+        body.exporting * {
+            transition: none !important;
+        }
+
         .spouse-connector {
             width: 30px;
             height: 3px;
@@ -837,7 +841,7 @@
                 <i class="fas fa-file-code"></i> Proje dosyası olarak kaydet
             </button>
             <button class="dropdown-item exit" onclick="logic.exitApp()">
-                <i class="fas fa-sign-out-alt"></i> Bi sikim yapmadan çıkış yap
+                <i class="fas fa-sign-out-alt"></i>Çıkış Yap
             </button>
         </div>
     </div>
@@ -1221,34 +1225,38 @@
                 const canvas = document.getElementById('tree-canvas');
                 const menu = document.getElementById('save-dropdown');
                 menu.classList.remove('open');
-                const originalTransform = canvas.style.transform;
-                canvas.style.transform = 'none';
-                try {
-                    const blobCanvas = await html2canvas(canvas, { backgroundColor: '#f0f2f5', scale: 2, useCORS: true });
-                    const link = document.createElement('a');
-                    link.download = `soy-agaci-${Date.now()}.png`;
-                    link.href = blobCanvas.toDataURL("image/png");
-                    link.click();
-                } catch (err) { console.error(err); }
-                canvas.style.transform = originalTransform;
+                await view.withExportState(async () => {
+                    const originalTransform = canvas.style.transform;
+                    canvas.style.transform = 'none';
+                    try {
+                        const blobCanvas = await html2canvas(canvas, { backgroundColor: '#f0f2f5', scale: 2, useCORS: true });
+                        const link = document.createElement('a');
+                        link.download = `soy-agaci-${Date.now()}.png`;
+                        link.href = blobCanvas.toDataURL("image/png");
+                        link.click();
+                    } catch (err) { console.error(err); }
+                    canvas.style.transform = originalTransform;
+                });
             },
 
             exportPDF: async () => {
                 const canvas = document.getElementById('tree-canvas');
                 const menu = document.getElementById('save-dropdown');
                 menu.classList.remove('open');
-                const originalTransform = canvas.style.transform;
-                canvas.style.transform = 'none';
-                try {
-                    const blobCanvas = await html2canvas(canvas, { backgroundColor: '#f0f2f5', scale: 2 });
-                    const imgData = blobCanvas.toDataURL('image/png');
-                    const { jsPDF } = window.jspdf;
-                    const orientation = blobCanvas.width > blobCanvas.height ? 'l' : 'p';
-                    const pdf = new jsPDF(orientation, 'px', [blobCanvas.width, blobCanvas.height]);
-                    pdf.addImage(imgData, 'PNG', 0, 0, blobCanvas.width, blobCanvas.height);
-                    pdf.save(`soy-agaci-${Date.now()}.pdf`);
-                } catch (err) { console.error(err); }
-                canvas.style.transform = originalTransform;
+                await view.withExportState(async () => {
+                    const originalTransform = canvas.style.transform;
+                    canvas.style.transform = 'none';
+                    try {
+                        const blobCanvas = await html2canvas(canvas, { backgroundColor: '#f0f2f5', scale: 2, useCORS: true });
+                        const imgData = blobCanvas.toDataURL('image/png');
+                        const { jsPDF } = window.jspdf;
+                        const orientation = blobCanvas.width > blobCanvas.height ? 'l' : 'p';
+                        const pdf = new jsPDF(orientation, 'px', [blobCanvas.width, blobCanvas.height]);
+                        pdf.addImage(imgData, 'PNG', 0, 0, blobCanvas.width, blobCanvas.height);
+                        pdf.save(`soy-agaci-${Date.now()}.pdf`);
+                    } catch (err) { console.error(err); }
+                    canvas.style.transform = originalTransform;
+                });
             },
 
             exportProject: () => {
@@ -1281,6 +1289,52 @@
                     view.scale = Math.min(Math.max(0.2, view.scale + delta), 2);
                     view.updateTransform();
                 });
+            },
+
+            withExportState: async (fn) => {
+                const body = document.body;
+                const noteEls = Array.from(document.querySelectorAll('.note-container'));
+                const previous = noteEls.map(el => ({
+                    el,
+                    maxHeight: el.style.maxHeight,
+                    marginTop: el.style.marginTop,
+                    paddingTop: el.style.paddingTop,
+                    borderTop: el.style.borderTop,
+                    minHeight: el.style.minHeight
+                }));
+
+                body.classList.add('exporting');
+                for (const el of noteEls) {
+                    const isOpen = el.classList.contains('open');
+                    if (isOpen) {
+                        el.style.maxHeight = '150px';
+                        el.style.marginTop = '8px';
+                        el.style.paddingTop = '8px';
+                        el.style.borderTop = '1px dashed #cbd5e1';
+                        el.style.minHeight = '80px';
+                    } else {
+                        el.style.maxHeight = '0px';
+                        el.style.marginTop = '0px';
+                        el.style.paddingTop = '0px';
+                        el.style.borderTop = 'none';
+                        el.style.minHeight = '0px';
+                    }
+                }
+
+                await new Promise(requestAnimationFrame);
+                await new Promise(requestAnimationFrame);
+                try {
+                    return await fn();
+                } finally {
+                    for (const p of previous) {
+                        p.el.style.maxHeight = p.maxHeight;
+                        p.el.style.marginTop = p.marginTop;
+                        p.el.style.paddingTop = p.paddingTop;
+                        p.el.style.borderTop = p.borderTop;
+                        p.el.style.minHeight = p.minHeight;
+                    }
+                    body.classList.remove('exporting');
+                }
             },
 
             toggleSaveMenu: () => {
@@ -1346,6 +1400,34 @@
                 container.appendChild(ul);
                 view.updateInfoPanel();
                 view.updateTransform();
+                requestAnimationFrame(view.alignChildrenGroups);
+            },
+
+            alignChildrenGroups: () => {
+                const lis = document.querySelectorAll('#tree-canvas li');
+                for (const li of lis) {
+                    const childUls = Array.from(li.children).filter(el => el.tagName === 'UL' && el.dataset && el.dataset.alignAnchorId);
+                    if (childUls.length === 0) continue;
+                    const liRect = li.getBoundingClientRect();
+
+                    for (const ul of childUls) {
+                        ul.style.position = 'relative';
+                        ul.style.left = '0px';
+                        const anchorId = ul.dataset.alignAnchorId;
+                        const anchor = li.querySelector(`.card-anchor[data-anchor-id="${CSS.escape(anchorId)}"]`);
+                        if (!anchor) continue;
+
+                        const anchorRect = anchor.getBoundingClientRect();
+                        const ulRect = ul.getBoundingClientRect();
+                        const anchorCenter = anchorRect.left + anchorRect.width / 2;
+                        const ulCenter = ulRect.left + ulRect.width / 2;
+                        const delta = anchorCenter - ulCenter;
+
+                        // Apply a small clamp to avoid absurd shifts in edge cases
+                        const clamped = Math.max(Math.min(delta, 1200), -1200);
+                        ul.style.left = `${Math.round(clamped)}px`;
+                    }
+                }
             },
 
             createNodeHTML: (node) => {
@@ -1355,6 +1437,7 @@
                 const hasChildren = node.childrenIds && node.childrenIds.length > 0;
                 const selfAnchor = document.createElement('div');
                 selfAnchor.className = 'card-anchor';
+                selfAnchor.dataset.anchorId = String(node.id);
                 selfAnchor.appendChild(view.createCard(node, false));
                 wrapper.appendChild(selfAnchor);
 
@@ -1370,6 +1453,7 @@
                         wrapper.appendChild(conn);
                         const spouseAnchor = document.createElement('div');
                         spouseAnchor.className = 'card-anchor';
+                        spouseAnchor.dataset.anchorId = String(spouse.id);
                         spouseAnchor.appendChild(view.createCard(spouse, true));
                         wrapper.appendChild(spouseAnchor);
                         spouseAnchors.push({ spouse, anchor: spouseAnchor, isPrimary: true });
@@ -1387,6 +1471,7 @@
                             wrapper.appendChild(conn);
                             const spouseAnchor = document.createElement('div');
                             spouseAnchor.className = 'card-anchor';
+                            spouseAnchor.dataset.anchorId = String(extraSpouse.id);
                             spouseAnchor.appendChild(view.createCard(extraSpouse, true));
                             wrapper.appendChild(spouseAnchor);
                             spouseAnchors.push({ spouse: extraSpouse, anchor: spouseAnchor, isPrimary: false });
@@ -1394,28 +1479,44 @@
                     });
                 }
 
-                if (hasChildren) {
-                    const dropLine = document.createElement('div');
-                    dropLine.className = 'children-drop-line';
-
-                    let anchor = selfAnchor;
-                    if (node.gender === 'female' && spouseAnchors.length > 0) {
-                        const ordered = [...spouseAnchors].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
-                        const maleSpouses = ordered.filter(x => x.spouse.gender === 'male');
-                        if (maleSpouses.length === 1) anchor = maleSpouses[0].anchor;
-                    }
-                    anchor.appendChild(dropLine);
-                }
-
                 li.appendChild(wrapper);
 
                 if (hasChildren) {
-                    const ul = document.createElement('ul');
+                    // Group children by the other parent (spouse) so they can align under the correct pairing
+                    const groups = new Map(); // key: otherParentId or 'none' -> child nodes
                     node.childrenIds.forEach(childId => {
                         const child = logic.find(childId);
-                        if (child) ul.appendChild(view.createNodeHTML(child));
+                        if (!child) return;
+                        const key = (child.otherParentId == null) ? 'none' : String(child.otherParentId);
+                        if (!groups.has(key)) groups.set(key, []);
+                        groups.get(key).push(child);
                     });
-                    li.appendChild(ul);
+
+                    const maleSpouseAnchors = spouseAnchors.filter(x => x.spouse.gender === 'male');
+                    const defaultNoneAnchor =
+                        (node.gender === 'female' && maleSpouseAnchors.length === 1) ? maleSpouseAnchors[0].anchor : selfAnchor;
+
+                    for (const [key, childNodes] of groups.entries()) {
+                        const ul = document.createElement('ul');
+                        ul.dataset.alignAnchorId = key === 'none' ? (defaultNoneAnchor.dataset.anchorId || String(node.id)) : key;
+
+                        // Drop line for this child group
+                        const dropLine = document.createElement('div');
+                        dropLine.className = 'children-drop-line';
+
+                        let anchor = null;
+                        if (key === 'none') {
+                            anchor = defaultNoneAnchor;
+                        } else {
+                            anchor = spouseAnchors.find(x => String(x.spouse.id) === key)?.anchor || selfAnchor;
+                        }
+                        anchor.appendChild(dropLine);
+
+                        childNodes.forEach(child => {
+                            ul.appendChild(view.createNodeHTML(child));
+                        });
+                        li.appendChild(ul);
+                    }
                 }
                 return li;
             },
